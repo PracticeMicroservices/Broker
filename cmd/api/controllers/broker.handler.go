@@ -1,15 +1,9 @@
 package controllers
 
 import (
-	"encoding/json"
+	"broker/cmd/api/helpers"
 	"net/http"
 )
-
-type jsonResponse struct {
-	Error   bool        `json:"error"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-}
 
 type Broker interface {
 	Broker(w http.ResponseWriter, r *http.Request)
@@ -22,14 +16,10 @@ func NewBrokerController() Broker {
 }
 
 func (b *brokerController) Broker(w http.ResponseWriter, r *http.Request) {
-	payload := jsonResponse{
+	res := &helpers.JsonResponse{
 		Error:   false,
-		Message: "Ping the broker",
+		Message: "Hello from the broker",
 		Data:    nil,
 	}
-
-	out, _ := json.MarshalIndent(payload, "", "\t")
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write(out)
+	_ = res.WriteJSON(w, http.StatusOK, nil)
 }
