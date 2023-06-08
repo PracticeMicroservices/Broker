@@ -7,15 +7,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type App struct {
 	Broker controllers.Broker
+	Rabbit *amqp.Connection
 }
 
-func NewApp() *App {
+func NewApp(rabbit *amqp.Connection) *App {
 	return &App{
-		Broker: controllers.NewBrokerController(),
+		Broker: controllers.NewBrokerController(rabbit),
+		Rabbit: rabbit,
 	}
 }
 

@@ -2,11 +2,14 @@ package controllers
 
 import (
 	"broker/cmd/api/helpers"
+	"broker/event"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Broker interface {
@@ -15,7 +18,8 @@ type Broker interface {
 }
 
 type brokerController struct {
-	json *helpers.JsonResponse
+	json   *helpers.JsonResponse
+	rabbit *amqp.Connection
 }
 
 type RequestPayload struct {
@@ -42,9 +46,10 @@ type MailPayload struct {
 	Message string `json:"message"`
 }
 
-func NewBrokerController() Broker {
+func NewBrokerController(rabbit *amqp.Connection) Broker {
 	return &brokerController{
-		json: &helpers.JsonResponse{},
+		json:   &helpers.JsonResponse{},
+		rabbit: rabbit,
 	}
 }
 
@@ -69,7 +74,7 @@ func (b *brokerController) HandleSubmission(w http.ResponseWriter, r *http.Reque
 	case "auth":
 		b.Authenticate(w, requestPayload.Auth)
 	case "log":
-		b.logItem(w, requestPayload.Log)
+		b.logEventViaRabbit(w, requestPayload.Log)
 	case "mail":
 		b.sendMail(w, requestPayload.Mail)
 	default:
@@ -197,4 +202,34 @@ func (b *brokerController) sendMail(w http.ResponseWriter, m MailPayload) {
 		Message: "Mail sent to " + m.To,
 	}
 	_ = payload.WriteJSON(w, http.StatusOK, nil)
+}
+
+func (b *brokerController) logEventViaRabbit(w http.ResponseWriter, l LogPayload) {
+	err := b.pushToQueue(l.Name, l.Data)
+	if err != nil {
+		_ = b.json.WriteJSONError(w, err)
+		return
+	}
+	payload := &helpers.JsonResponse{
+		Error:   false,
+		Message: "Logged via RabbitMQ",
+	}
+	_ = payload.WriteJSON(w, http.StatusOK, nil)
+}
+
+func (b *brokerController) pushToQueue(name, msg string) error {
+	emitter, err := event.NewEmitter(b.rabbit)
+	if err != nil {
+		return err
+	}
+	payload := LogPayload{
+		Name: name,
+		Data: msg,
+	}
+	j, _ := json.MarshalIndent(&payload, "", "\t")
+	err = emitter.Push(string(j), "log.INFO")
+	if err != nil {
+		return err
+	}
+	return nil
 }

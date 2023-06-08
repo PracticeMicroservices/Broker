@@ -1,12 +1,17 @@
 package main
 
 import (
+	"broker/rabbitMQ"
 	"log"
 	"net/http"
 )
 
 func main() {
-	app := NewApp()
+	connection, err := rabbitMQ.Connect()
+	if err != nil {
+		log.Fatal(err)
+	}
+	app := NewApp(connection)
 
 	log.Println("Starting Broker service on port 80")
 
@@ -17,7 +22,7 @@ func main() {
 	}
 
 	//start server
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
