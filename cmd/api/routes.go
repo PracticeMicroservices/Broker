@@ -13,12 +13,14 @@ import (
 
 type App struct {
 	Broker controllers.Broker
+	GRPC   controllers.GRPC
 	Rabbit *amqp.Connection
 }
 
 func NewApp(rabbit *amqp.Connection) *App {
 	return &App{
 		Broker: controllers.NewBrokerController(rabbit),
+		GRPC:   controllers.NewGRPCController(),
 		Rabbit: rabbit,
 	}
 }
@@ -35,9 +37,10 @@ func (app *App) routes() http.Handler {
 		MaxAge:           300,
 	}))
 	mux.Use(middleware.Heartbeat("/healthCheck"))
-	//add routes
-	mux.Post("/broker", app.Broker.Broker)
 
+	mux.Post("/broker", app.Broker.Broker)
+	mux.Post("/log-grpc", app.GRPC.LogViaGRPC)
 	mux.Post("/handle", app.Broker.HandleSubmission)
+
 	return mux
 }

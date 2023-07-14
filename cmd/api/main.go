@@ -13,11 +13,11 @@ func main() {
 	}
 	app := NewApp(connection)
 
-	log.Println("Starting Broker service on port 80")
+	log.Println("Starting Broker service on port 8080")
 
 	//define server
 	srv := &http.Server{
-		Addr:    ":80",
+		Addr:    ":8080",
 		Handler: app.routes(),
 	}
 

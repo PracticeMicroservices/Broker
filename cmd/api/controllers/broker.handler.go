@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/rpc"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -74,7 +75,7 @@ func (b *brokerController) HandleSubmission(w http.ResponseWriter, r *http.Reque
 	case "auth":
 		b.Authenticate(w, requestPayload.Auth)
 	case "log":
-		b.logEventViaRabbit(w, requestPayload.Log)
+		b.logItemViaRPC(w, requestPayload.Log)
 	case "mail":
 		b.sendMail(w, requestPayload.Mail)
 	default:
@@ -232,4 +233,36 @@ func (b *brokerController) pushToQueue(name, msg string) error {
 		return err
 	}
 	return nil
+}
+
+type RPCPayload struct {
+	Name string
+	Data string
+}
+
+func (b *brokerController) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
+	client, err := rpc.Dial("tcp", "logger-service:5001")
+	if err != nil {
+		_ = b.json.WriteJSONError(w, err)
+		return
+	}
+
+	rpcPayload := RPCPayload{
+		Name: l.Name,
+		Data: l.Data,
+	}
+
+	var reply string
+
+	err = client.Call("Server.LogInfo", rpcPayload, &reply)
+	if err != nil {
+		_ = b.json.WriteJSONError(w, err)
+		return
+	}
+
+	payload := &helpers.JsonResponse{
+		Error:   false,
+		Message: "Logged via RPC" + reply,
+	}
+	_ = payload.WriteJSON(w, http.StatusOK, nil)
 }
